@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Wand2, Eraser, ImagePlus, Maximize, Scissors, RefreshCw,
@@ -6,7 +6,7 @@ import {
   ChevronDown, Settings2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import type { Node } from './InfiniteCanvas';
+import type { Node } from '../store/canvasStore';
 
 interface NodeEditorPanelProps {
   node: Node;
@@ -87,6 +87,28 @@ export const NodeEditorPanel: React.FC<NodeEditorPanelProps> = ({
   const [showModelSelect, setShowModelSelect] = useState(false);
   const [showStyleSelect, setShowStyleSelect] = useState(false);
 
+  const modelRef = useRef<HTMLDivElement>(null);
+  const styleRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPrompt(node.content || '');
+  }, [node.id, node.content]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelRef.current && !modelRef.current.contains(e.target as Node)) {
+        setShowModelSelect(false);
+      }
+      if (styleRef.current && !styleRef.current.contains(e.target as Node)) {
+        setShowStyleSelect(false);
+      }
+    };
+    if (showModelSelect || showStyleSelect) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showModelSelect, showStyleSelect]);
+
   const handleGenerate = () => {
     if (!prompt.trim()) return;
     onGenerate(prompt, params);
@@ -95,12 +117,19 @@ export const NodeEditorPanel: React.FC<NodeEditorPanelProps> = ({
   const handleToolClick = (toolId: string) => {
     if (toolId === 'download') {
       if (node.previewUrl) {
-        const link = document.createElement('a');
-        link.href = node.previewUrl;
-        link.download = `${node.title || 'image'}-${node.id}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        fetch(node.previewUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = `${node.title || 'image'}-${node.id}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+          })
+          .catch(err => console.error("下载失败", err));
       }
     } else {
       setActiveTool(activeTool === toolId ? null : toolId);
@@ -200,7 +229,15 @@ export const NodeEditorPanel: React.FC<NodeEditorPanelProps> = ({
                   <textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    placeholder="描述你想要的图片..."
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        if (!isGenerating && prompt.trim()) {
+                          handleGenerate();
+                        }
+                      }
+                    }}
+                    placeholder="描述你想要的图片... (Cmd/Ctrl + Enter 快捷生成)"
                     className="w-full h-20 bg-[#0d0d0d] border border-white/10 rounded-xl px-4 py-3 text-white/90 placeholder:text-white/30 resize-none focus:outline-none focus:border-white/20"
                   />
                   <button
@@ -225,7 +262,7 @@ export const NodeEditorPanel: React.FC<NodeEditorPanelProps> = ({
               {/* Parameters Bar */}
               <div className="flex items-center gap-2 px-4 py-3 border-t border-white/5">
                 {/* Model Selector */}
-                <div className="relative">
+                <div className="relative" ref={modelRef}>
                   <button
                     onClick={() => setShowModelSelect(!showModelSelect)}
                     className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-sm"
@@ -278,7 +315,7 @@ export const NodeEditorPanel: React.FC<NodeEditorPanelProps> = ({
                 </div>
 
                 {/* Style Selector */}
-                <div className="relative">
+                <div className="relative" ref={styleRef}>
                   <button
                     onClick={() => setShowStyleSelect(!showStyleSelect)}
                     className="flex items-center gap-2 px-3 py-2 bg-[#0d0d0d] border border-white/10 rounded-lg text-white/70 hover:text-white hover:border-white/20 transition-all text-sm"

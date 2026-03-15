@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useCanvasStore } from '../store/canvasStore';
 import { 
   Plus, MousePointer2, Image as ImageIcon, Video, Type, Music, 
   Upload, Settings, Share2, Download, Play, Sparkles, Hand, X,
@@ -14,22 +15,6 @@ import { TextCanvasNode } from './TextCanvasNode';
 import { ImageCanvasNode } from './ImageCanvasNode';
 import { VideoCanvasNode } from './VideoCanvasNode';
 import { AudioCanvasNode } from './AudioCanvasNode';
-
-export interface Node {
-  id: string;
-  type: 'text' | 'image' | 'video' | 'audio';
-  x: number;
-  y: number;
-  content: string;
-  title: string;
-  status?: 'idle' | 'generating' | 'done';
-  previewUrl?: string;
-}
-
-export interface Connection {
-  from: string;
-  to: string;
-}
 
 const INITIAL_NODES: Node[] = [
   { id: '1', type: 'text', x: 100, y: 200, title: 'Text', content: '1. 开启你的创作...' },
@@ -127,11 +112,42 @@ CanvasNode.displayName = 'CanvasNode';
 
 export const InfiniteCanvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes] = useState<Node[]>(INITIAL_NODES);
-  const [connections, setConnections] = useState<Connection[]>(INITIAL_CONNECTIONS);
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+  
+  // Zustand State
+  const nodes = useCanvasStore((state) => state.nodes);
+  const setNodes = useCanvasStore((state) => state.setNodes);
+  const connections = useCanvasStore((state) => state.connections);
+  const setConnections = useCanvasStore((state) => state.setConnections);
+  const { scale, x, y } = useCanvasStore((state) => state.viewState);
+  const setViewState = useCanvasStore((state) => state.setViewState);
+  
+  // Mapping local state to Zustand viewState for smooth transition
+  const position = { x, y };
+  const setPosition = (pos: { x: number, y: number } | ((prev: { x: number, y: number }) => { x: number, y: number })) => {
+    if (typeof pos === 'function') {
+      const newPos = pos({ x, y });
+      setViewState(prev => ({ ...prev, x: newPos.x, y: newPos.y }));
+    } else {
+      setViewState(prev => ({ ...prev, x: pos.x, y: pos.y }));
+    }
+  };
+  const setScale = (newScale: number | ((prev: number) => number)) => {
+    if (typeof newScale === 'function') {
+      setViewState(prev => ({ ...prev, scale: newScale(prev.scale) }));
+    } else {
+      setViewState(prev => ({ ...prev, scale: newScale }));
+    }
+  };
+
   const [windowSize, setWindowSize] = useState({ width: typeof window !== 'undefined' ? window.innerWidth : 1920, height: typeof window !== 'undefined' ? window.innerHeight : 1080 });
+
+  // Initialize store with default data on mount
+  useEffect(() => {
+    if (nodes.length === 0) {
+      setNodes(INITIAL_NODES);
+      setConnections(INITIAL_CONNECTIONS);
+    }
+  }, []);
 
   // Interaction states
   const [isPanning, setIsPanning] = useState(false);
@@ -174,6 +190,16 @@ export const InfiniteCanvas: React.FC = () => {
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const selectedNodesRef = useRef(selectedNodes);
   const nodesRef = useRef(nodes);
+
+  // Sync selectedNodeId with Zustand for Side Panel
+  const setSelectedNodeId = useCanvasStore((state) => state.setSelectedNodeId);
+  useEffect(() => {
+    if (selectedNodes.length === 1) {
+      setSelectedNodeId(selectedNodes[0]);
+    } else {
+      setSelectedNodeId(null);
+    }
+  }, [selectedNodes, setSelectedNodeId]);
 
   useEffect(() => {
     selectedNodesRef.current = selectedNodes;
@@ -230,9 +256,11 @@ export const InfiniteCanvas: React.FC = () => {
       
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodesRef.current.length > 0) {
-          setNodes(prev => prev.filter(n => !selectedNodesRef.current.includes(n.id)));
-          setConnections(prev => prev.filter(c => !selectedNodesRef.current.includes(c.from) && !selectedNodesRef.current.includes(c.to)));
-          setSelectedNodes([]);
+    const updatedNodes = useCanvasStore.getState().nodes.filter(n => !selectedNodesRef.current.includes(n.id));
+    useCanvasStore.getState().setNodes(updatedNodes);
+    const updatedConns = useCanvasStore.getState().connections.filter(c => !selectedNodesRef.current.includes(c.from) && !selectedNodesRef.current.includes(c.to));
+    useCanvasStore.getState().setConnections(updatedConns);
+    setSelectedNodes([]);
         }
       }
 

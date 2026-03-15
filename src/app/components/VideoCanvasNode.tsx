@@ -3,7 +3,7 @@ import {
   Plus, Video, Upload, Sparkles, ChevronUp, RefreshCw, Volume2, Play, Monitor, Zap
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Node } from './InfiniteCanvas';
+import { Node } from '../store/canvasStore';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface VideoCanvasNodeProps {

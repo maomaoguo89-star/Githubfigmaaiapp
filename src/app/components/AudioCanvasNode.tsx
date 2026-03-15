@@ -3,7 +3,7 @@ import {
   Plus, Music, Upload, ChevronUp, Mic, SlidersHorizontal, Zap, Maximize2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Node } from './InfiniteCanvas';
+import { Node } from '../store/canvasStore';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface AudioCanvasNodeProps {
